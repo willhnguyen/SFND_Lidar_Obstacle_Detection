@@ -18,6 +18,7 @@
 #include <ctime>
 #include <chrono>
 #include "render/box.h"
+#include "../src/collections/kdtree.h"
 
 template<typename PointT>
 class ProcessPointClouds {
@@ -45,6 +46,10 @@ public:
     typename pcl::PointCloud<PointT>::Ptr loadPcd(std::string file);
 
     std::vector<boost::filesystem::path> streamPcd(std::string dataPath);
+
+    std::vector<float> vectorize(PointT& p);
+
+    void proximity(typename pcl::PointCloud<PointT>::Ptr cloud, float clusterTolerance, KdTree &tree, std::vector<bool>& processed_points, typename pcl::PointCloud<PointT>::Ptr cluster, int idx);
   
 };
 #endif /* PROCESSPOINTCLOUDS_H_ */

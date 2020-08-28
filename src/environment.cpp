@@ -1,4 +1,4 @@
-/* \author Aaron Brown */
+/* \author William Nguyen */
 // Create simple 3d highway enviroment using PCL
 // for exploring self-driving car sensors
 
@@ -103,7 +103,7 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer, ProcessPointCloud
 
     // Segment and Cluster
     std::pair<pcl::PointCloud<pcl::PointXYZI>::Ptr, pcl::PointCloud<pcl::PointXYZI>::Ptr> segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 100, 0.2);
-    std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> cloudClusters = pointProcessorI->Clustering(segmentCloud.first, 0.5, 5, 1000);
+    std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> cloudClusters = pointProcessorI->Clustering(segmentCloud.first, 0.45, 15, 700);
 
     // Visualize
     int clusterId = 0;
@@ -121,12 +121,23 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer, ProcessPointCloud
         ++clusterId;
     }
 
+    // Visualize the car
+    Box egoCar;
+    egoCar.x_min = -2;
+    egoCar.x_max = 2;
+    egoCar.y_min = -1.5;
+    egoCar.y_max = 1.5;
+    egoCar.z_min = -1.5;
+    egoCar.z_max = 1;
+    renderBox(viewer, egoCar, clusterId, Color(1, 0, 1));
+
     renderPointCloud(viewer, segmentCloud.second, "planeCloud", Color(0.25, 0.25, 0.25));
 }
 
 
 int main (int argc, char** argv)
 {
+    
     std::cout << "starting enviroment" << std::endl;
 
     pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
@@ -134,7 +145,8 @@ int main (int argc, char** argv)
     initCamera(setAngle, viewer);
     // simpleHighway(viewer);
     ProcessPointClouds<pcl::PointXYZI>* pointProcessorI = new ProcessPointClouds<pcl::PointXYZI>();
-    std::vector<boost::filesystem::path> stream = pointProcessorI->streamPcd("../src/sensors/data/pcd/data_2");
+    std::string dataStreamPath = argc == 2 ? argv[1] : "../src/sensors/data/pcd/data_1";
+    std::vector<boost::filesystem::path> stream = pointProcessorI->streamPcd(dataStreamPath);
     auto streamIterator = stream.begin();
     pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloudI;
 
