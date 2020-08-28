@@ -27,13 +27,37 @@ typename pcl::PointCloud<PointT>::Ptr ProcessPointClouds<PointT>::FilterCloud(ty
     // Time segmentation process
     auto startTime = std::chrono::steady_clock::now();
 
-    // TODO:: Fill in the function to do voxel grid point reduction and region based filtering
+    // Downsample point cloud by voxel resolution
+    typename pcl::PointCloud<PointT>::Ptr cloudFiltered(new pcl::PointCloud<PointT>());
+
+    pcl::VoxelGrid<PointT> vg;
+    vg.setInputCloud(cloud);
+    vg.setLeafSize(filterRes, filterRes, filterRes);
+    vg.filter(*cloudFiltered);
+
+    // Downsample point cloud by cropping view
+    typename pcl::PointCloud<PointT>::Ptr cloudRegion(new typename pcl::PointCloud<PointT>());
+
+    pcl::CropBox<PointT> cb;
+    cb.setInputCloud(cloudFiltered);
+    cb.setMin(minPoint);
+    cb.setMax(maxPoint);
+    cb.filter(*cloudRegion);
+
+    // Downsample by clearing car roof points
+    typename pcl::PointCloud<PointT>::Ptr cloudRegionNoRoof(new typename pcl::PointCloud<PointT>());
+
+    cb.setInputCloud(cloudRegion);
+    cb.setMin(Eigen::Vector4f(-3, -2, -3, 1));
+    cb.setMax(Eigen::Vector4f(3, 2, 1, 1));
+    cb.setNegative(true);
+    cb.filter(*cloudRegionNoRoof);
 
     auto endTime = std::chrono::steady_clock::now();
     auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
     std::cout << "filtering took " << elapsedTime.count() << " milliseconds" << std::endl;
 
-    return cloud;
+    return cloudRegionNoRoof;
 
 }
 
@@ -65,89 +89,89 @@ std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT
     auto startTime = std::chrono::steady_clock::now();
 	pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
 
-    // // Create segmentation object
-    // pcl::SACSegmentation<PointT> seg;
-    // seg.setOptimizeCoefficients(true);
-    // seg.setModelType(pcl::SACMODEL_PLANE);
-    // seg.setMethodType(pcl::SAC_RANSAC);
-    // seg.setMaxIterations(maxIterations);
-    // seg.setDistanceThreshold(distanceThreshold);
+    // Create segmentation object
+    pcl::SACSegmentation<PointT> seg;
+    seg.setOptimizeCoefficients(true);
+    seg.setModelType(pcl::SACMODEL_PLANE);
+    seg.setMethodType(pcl::SAC_RANSAC);
+    seg.setMaxIterations(maxIterations);
+    seg.setDistanceThreshold(distanceThreshold);
 
-    // // Find inliers for the cloud
-    // pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
-    // seg.setInputCloud(cloud);
-    // seg.segment(*inliers, *coefficients);
-    // if (inliers->indices.size() == 0)
-    // {
-    //     std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
-    // }
-
-	srand(time(NULL));
-    auto cloud_size = cloud->size();
-
-    std::unordered_set<int> inliersResult;
-    inliersResult.reserve(cloud_size);
-
-	// RANSAC Implementation
-    std::unordered_set<int> inliersSet;
-    inliersSet.reserve(cloud_size);
-
-	while(maxIterations--)
-	{
-        inliersSet.clear();
-		
-		// Randomly sample subset and fit line
-		int a_index = rand() % cloud_size;
-		int b_index = rand() % cloud_size;
-		int c_index = rand() % cloud_size;
-		inliersSet.insert(a_index);
-		inliersSet.insert(b_index);
-		inliersSet.insert(c_index);
-
-		pcl::PointXYZ& a = cloud->points[a_index];
-		pcl::PointXYZ& b = cloud->points[b_index];
-		pcl::PointXYZ& c = cloud->points[c_index];
-
-		float x1 = a.x, y1 = a.y, z1 = a.z,
-		      x2 = b.x, y2 = b.y, z2 = b.z,
-		      x3 = c.x, y3 = c.y, z3 = c.z;
-
-		// Rays: v1 = (b - a), v2 = (c - a)
-		float xv1 = x2 - x1, yv1 = y2 - y1, zv1 = z2 - z1,
-		      xv2 = x3 - x1, yv2 = y3 - y1, zv2 = z3 - z1;
-		
-		// Cross Product: u = v1 x v2
-		float uA = yv1 * zv2 - yv2 * zv1,
-		      uB = zv1 * xv2 - zv2 * xv1,
-			  uC = xv1 * yv2 - xv2 * yv1,
-			  uD = -(uA * x1 + uB * y1 + uC * z1);
-
-		// Measure distance between every point and fitted line
-		for (int i = 0; i < cloud_size; ++i)
-		{
-            if (inliersSet.find(i) != inliersSet.end()) {
-                continue;
-            }
-
-			// If distance is smaller than threshold count it as inlier
-			pcl::PointXYZ& p = cloud->points[i];
-			float distance = fabs(uA * p.x + uB * p.y + uC * p.z + uD) / sqrt(uA * uA + uB * uB + uC * uC);
-			if (distance < distanceThreshold) {
-				inliersSet.insert(i);
-			}
-		}
-
-		// Return indices of inliers from fitted line with most inliers
-		if (inliersSet.size() > inliersResult.size()) {
-			inliersResult = inliersSet;
-		}
-	}
-
-    std::vector<int> &indices = inliers->indices;
-    indices.reserve(inliersResult.size());
-    for (int i : inliersResult) {
-        indices.push_back(i);
+    // Find inliers for the cloud
+    pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
+    seg.setInputCloud(cloud);
+    seg.segment(*inliers, *coefficients);
+    if (inliers->indices.size() == 0)
+    {
+        std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
     }
+
+	// srand(time(NULL));
+    // auto cloud_size = cloud->size();
+
+    // std::unordered_set<int> inliersResult;
+    // inliersResult.reserve(cloud_size);
+
+	// // RANSAC Implementation
+    // std::unordered_set<int> inliersSet;
+    // inliersSet.reserve(cloud_size);
+
+	// while(maxIterations--)
+	// {
+    //     inliersSet.clear();
+		
+	// 	// Randomly sample subset and fit line
+	// 	int a_index = rand() % cloud_size;
+	// 	int b_index = rand() % cloud_size;
+	// 	int c_index = rand() % cloud_size;
+	// 	inliersSet.insert(a_index);
+	// 	inliersSet.insert(b_index);
+	// 	inliersSet.insert(c_index);
+
+	// 	pcl::PointXYZ& a = cloud->points[a_index];
+	// 	pcl::PointXYZ& b = cloud->points[b_index];
+	// 	pcl::PointXYZ& c = cloud->points[c_index];
+
+	// 	float x1 = a.x, y1 = a.y, z1 = a.z,
+	// 	      x2 = b.x, y2 = b.y, z2 = b.z,
+	// 	      x3 = c.x, y3 = c.y, z3 = c.z;
+
+	// 	// Rays: v1 = (b - a), v2 = (c - a)
+	// 	float xv1 = x2 - x1, yv1 = y2 - y1, zv1 = z2 - z1,
+	// 	      xv2 = x3 - x1, yv2 = y3 - y1, zv2 = z3 - z1;
+		
+	// 	// Cross Product: u = v1 x v2
+	// 	float uA = yv1 * zv2 - yv2 * zv1,
+	// 	      uB = zv1 * xv2 - zv2 * xv1,
+	// 		  uC = xv1 * yv2 - xv2 * yv1,
+	// 		  uD = -(uA * x1 + uB * y1 + uC * z1);
+
+	// 	// Measure distance between every point and fitted line
+	// 	for (int i = 0; i < cloud_size; ++i)
+	// 	{
+    //         if (inliersSet.find(i) != inliersSet.end()) {
+    //             continue;
+    //         }
+
+	// 		// If distance is smaller than threshold count it as inlier
+	// 		pcl::PointXYZ& p = cloud->points[i];
+	// 		float distance = fabs(uA * p.x + uB * p.y + uC * p.z + uD) / sqrt(uA * uA + uB * uB + uC * uC);
+	// 		if (distance < distanceThreshold) {
+	// 			inliersSet.insert(i);
+	// 		}
+	// 	}
+
+	// 	// Return indices of inliers from fitted line with most inliers
+	// 	if (inliersSet.size() > inliersResult.size()) {
+	// 		inliersResult = inliersSet;
+	// 	}
+	// }
+
+    // std::vector<int> &indices = inliers->indices;
+    // indices.reserve(inliersResult.size());
+    // for (int i : inliersResult) {
+    //     indices.push_back(i);
+    // }
 
     auto endTime = std::chrono::steady_clock::now();
     auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
@@ -167,7 +191,30 @@ std::vector<typename pcl::PointCloud<PointT>::Ptr> ProcessPointClouds<PointT>::C
 
     std::vector<typename pcl::PointCloud<PointT>::Ptr> clusters;
 
-    // TODO:: Fill in the function to perform euclidean clustering to group detected obstacles
+    // Euclidean clustering to group detected obstacles
+    typename pcl::search::KdTree<PointT>::Ptr tree(new pcl::search::KdTree<PointT>());
+    tree->setInputCloud(cloud);
+
+    std::vector<pcl::PointIndices> cluster_indices;
+    pcl::EuclideanClusterExtraction<PointT> ec;
+    ec.setClusterTolerance(clusterTolerance);
+    ec.setMinClusterSize(minSize);
+    ec.setMaxClusterSize(maxSize);
+    ec.setSearchMethod(tree);
+    ec.setInputCloud(cloud);
+    ec.extract(cluster_indices);
+ 
+    for (pcl::PointIndices& cluster_group : cluster_indices) {
+        typename pcl::PointCloud<PointT>::Ptr cluster(new pcl::PointCloud<PointT>());
+        for (int cluster_point_index : cluster_group.indices) {
+            cluster->points.push_back(cloud->points[cluster_point_index]);
+        }
+        cluster->width = cluster->points.size();
+        cluster->height = 1;
+        cluster->is_dense = true;
+
+        clusters.push_back(cluster);
+    }
 
     auto endTime = std::chrono::steady_clock::now();
     auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
