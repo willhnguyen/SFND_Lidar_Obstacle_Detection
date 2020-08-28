@@ -1,31 +1,23 @@
-# Sensor Fusion Self-Driving Car Course
+# Sensor Fusion Self-Driving Car: Lidar Obstacle Detection
 
 <img src="media/ObstacleDetectionFPS.gif" width="700" height="400" />
 
-### Welcome to the Sensor Fusion course for self-driving cars.
+In this project, students are tasked with processing and visualizing LiDAR data. LiDAR captures high resolution data by casting a series of lasers and sensing the returned signals. On self-driving cars, the LiDAR sensor is usually a rotating device located at the top of car, but may also be accompanied by additional LiDAR sensors around the sides of the car.
 
-In this course we will be talking about sensor fusion, whch is the process of taking data from multiple sensors and combining it to give us a better understanding of the world around us. we will mostly be focusing on two sensors, lidar, and radar. By the end we will be fusing the data from these two sensors to track multiple cars on the road, estimating their positions and speed.
+LiDAR data processing involves filtering and clustering point cloud data. By doing so, we can separate the various entities on the road (e.g. road, cars, street signs) from one another. Identifying these entities is important as it influences path planning and decisions that ensure passenger safety.
 
-**Lidar** sensing gives us high resolution data by sending out thousands of laser signals. These lasers bounce off objects, returning to the sensor where we can then determine how far away objects are by timing how long it takes for the signal to return. Also we can tell a little bit about the object that was hit by measuring the intesity of the returned signal. Each laser ray is in the infrared spectrum, and is sent out at many different angles, usually in a 360 degree range. While lidar sensors gives us very high accurate models for the world around us in 3D, they are currently very expensive, upwards of $60,000 for a standard unit.
+The first step in point cloud clustering is identifying the road. Assuming a flat surface, the road can be segmented by using RANSAC to identify the majority of the points that lie on the same plane. RANSAC for planes involves randomly choosing a series of 3 points to define a plane, collecting the points that lie on the defined plane, and choosing the plane that contains the most points.
 
-**Radar** data is typically very sparse and in a limited range, however it can directly tell us how fast an object is moving in a certain direction. This ability makes radars a very pratical sensor for doing things like cruise control where its important to know how fast the car infront of you is traveling. Radar sensors are also very affordable and common now of days in newer cars.
-
-**Sensor Fusion** by combing lidar's high resoultion imaging with radar's ability to measure velocity of objects we can get a better understanding of the sorrounding environment than we could using one of the sensors alone.
+The second step in point cloud clustering is separating non-road entities from one another using Euclidean clustering. Euclidean clustering involves identifying and grouping points that are close to other points within a defined distance threshold. To ensure this computation happens quickly, a Kd-tree can be used to limit search to the most relevant regions.
 
 
-## Installation
+## Development Setup
+The lidar obstacle detection project requires the [Point Cloud Library](https://pointclouds.org) to be installed.
 
 ### Ubuntu 
-
 ```bash
-$> sudo apt install libpcl-dev
-$> cd ~
-$> git clone https://github.com/udacity/SFND_Lidar_Obstacle_Detection.git
-$> cd SFND_Lidar_Obstacle_Detection
-$> mkdir build && cd build
-$> cmake ..
-$> make
-$> ./environment
+sudo apt update
+sudo apt install libpcl-dev
 ```
 
 ### Windows 
@@ -35,23 +27,15 @@ http://www.pointclouds.org/downloads/windows.html
 ### MAC
 
 #### Install via Homebrew
-1. install [homebrew](https://brew.sh/)
-2. update homebrew 
-	```bash
-	$> brew update
-	```
-3. add  homebrew science [tap](https://docs.brew.sh/Taps) 
-	```bash
-	$> brew tap brewsci/science
-	```
-4. view pcl install options
-	```bash
-	$> brew options pcl
-	```
-5. install PCL 
-	```bash
-	$> brew install pcl
-	```
+1. install [homebrew](https://brew.sh)
+
+2. install PCL
+```bash
+brew update
+brew tap brewsci/science
+brew options pcl
+brew install pcl
+```
 
 #### Prebuilt Binaries via Universal Installer
 http://www.pointclouds.org/downloads/macosx.html  
@@ -62,3 +46,21 @@ NOTE: very old version
 [PCL Source Github](https://github.com/PointCloudLibrary/pcl)
 
 [PCL Mac Compilation Docs](http://www.pointclouds.org/documentation/tutorials/compiling_pcl_macosx.php)
+
+## Build and Run
+```brew
+cd ~
+git clone https://github.com/willhnguyen/SFND_Lidar_Obstacle_Detection.git
+cd SFND_Lidar_Obstacle_Detection
+mkdir build && cd build
+cmake ..
+make
+./environment
+```
+
+## Notes
+Euclidean clustering is implemented two different ways. The first way is akin to breadth first search involving a queue of nodes to be visited. The second is akin to depth first search involving a recursive call stack. The depth first search method seems to be a second or so faster. Both implementations run within 6-9 milliseconds.
+
+The implemented plane segmentation using RANSAC is a bottleneck with a runtime of around 25 milliseconds when max iterations is set to 30. Although this number seems low, it hasn't chosen a bad plane fitting as of yet.
+
+With the selected hyperparameters, cars are successfully segmented without gaining or losing cluster identification during a run (as long as the car is visible and not occluded by other cars or objects). However, poles possibly representing street signs may disappear a few times.

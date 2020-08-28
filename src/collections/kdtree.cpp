@@ -60,7 +60,7 @@ void KdTree::insert(std::vector<float>& point, int id) {
 /**
  * Calculates the distance between points a and b
  */
-inline float KdTree::_calc_distance(std::vector<float>& a, std::vector<float>& b) {
+inline float KdTree::_calcDistance(std::vector<float>& a, std::vector<float>& b) {
     float distance = 0;
     for (int i = 0; i < n_dims; ++i) {
         float c = _pointValue(a, i) - _pointValue(b, i);
@@ -72,19 +72,19 @@ inline float KdTree::_calc_distance(std::vector<float>& a, std::vector<float>& b
 /**
  * Checks if scalar value a is within distance tolerance of scalar value b
  */
-inline bool KdTree::_a_within_b(float a, float b, float distanceTol) {
+inline bool KdTree::_aWithinB(float a, float b, float distanceTol) {
     return a >= (b - distanceTol) && a <= (b + distanceTol);
 }
 
 /**
  * Checks if point a is within distance tolerance of point b
  */
-inline bool KdTree::_a_within_b(std::vector<float>& a, std::vector<float>& b, float distanceTol)
+inline bool KdTree::_aWithinB(std::vector<float>& a, std::vector<float>& b, float distanceTol)
 {
     for (int i = 0; i < n_dims; ++i) {
         float ai = _pointValue(a,i);
         float bi = _pointValue(b,i);
-        if (!_a_within_b(ai, bi, distanceTol)) {
+        if (!_aWithinB(ai, bi, distanceTol)) {
             return false;
         }
     }
@@ -99,18 +99,20 @@ void KdTree::_search(Node* node, std::vector<float>& target, int dim_level, floa
         return;
     }
 
-    if (_a_within_b(node->point, target, distanceTol)) {
-        if (_calc_distance(node->point, target) <= distanceTol) {
+    // Aggregate node's point if it's within distance from target point
+    if (_aWithinB(node->point, target, distanceTol)) {
+        if (_calcDistance(node->point, target) <= distanceTol) {
             ids.push_back(node->id);
         }
     }
 
+    // Search children nodes if target is within distance tolerance of region
     float target_i = _pointValue(target, dim_level);
     float node_point_i = _pointValue(node->point, dim_level);
-    if ((target_i-distanceTol) < node_point_i) {
+    if (target_i < node_point_i + distanceTol) {
         _search(node->left, target, dim_level + 1, distanceTol, ids);
     }
-    if ((target_i+distanceTol) > node_point_i) {
+    if (target_i > node_point_i - distanceTol) {
         _search(node->right, target, dim_level + 1, distanceTol, ids);
     }
 }

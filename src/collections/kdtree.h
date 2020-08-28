@@ -31,9 +31,9 @@ struct KdTree
     void _insert(Node** node, std::vector<float>& point, int id, int dim_level);
     void _search(Node* node, std::vector<float>& target, int dim_level, float distanceTol, std::vector<int>& ids);
     inline float _pointValue(std::vector<float>& p, int dim_level);
-    inline float _calc_distance(std::vector<float>& a, std::vector<float>& b);
-    inline bool _a_within_b(float a, float b, float distanceTol);
-    inline bool _a_within_b(std::vector<float>& a, std::vector<float>& b, float distanceTol);
+    inline float _calcDistance(std::vector<float>& a, std::vector<float>& b);
+    inline bool _aWithinB(float a, float b, float distanceTol);
+    inline bool _aWithinB(std::vector<float>& a, std::vector<float>& b, float distanceTol);
 };
 
 #endif
